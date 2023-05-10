@@ -88,6 +88,34 @@ def delete_income(ID):
         c.execute(command,([ID]))
     conn.commit()
     print('deleted')
+######TOTAL#######
+def total_income():
+    with conn:
+        command = 'SELECT price FROM income'
+        c.execute(command)
+        result = c.fetchall()
+        # print('TOTAL: ',result)
+        # total_list = []
+        # for r in result:
+        #     total_list.append(r[0])
+        total = sum([r[0] for r in result])
+    return total
+
+# t = total_income()
+# print('Total (Baht):',t)
+
+def total_expense():
+    with conn:
+        command = 'SELECT price FROM expense'
+        c.execute(command)
+        result = c.fetchall()
+        total = sum([r[0] for r in result])
+    return total
+
+
+# print(total_income())
+# print(total_expense())
+# print(total_income()-total_expense())
 
 #######################
 def writecsv(data):
@@ -173,6 +201,8 @@ def SaveData(event=None):
     v_amount.set('')
     E1.focus()
     update_table()
+    update_graph()
+    total_text()
 
 E2.bind('<Return>',SaveData) # event=None
 E1.bind('<Return>', lambda x: E2.focus()) #ฟังชั่นพิเศษ bind โดยไม่ต้องสร้างฟังชั่น
@@ -237,6 +267,8 @@ def delete_data(event):
     if check:
         delete_expense(ID)
         update_table()
+        update_graph()
+        total_text()
 
 def update_data(event):
     select = table.selection()
@@ -270,6 +302,8 @@ def update_data(event):
         update_expense(ID,'title',v_expense2.get())
         update_expense(ID,'price',float(v_amount2.get()))
         update_table()
+        update_graph()
+        total_text()
         GUI2.destroy() #ปิดหน้าต่าง GUI2 ทิ้ง อยากใช้ค่อยเปิดใหม่
 
     B1 = ttk.Button(GUI2,text='บันทึก',command=UpdateData)
@@ -319,6 +353,12 @@ def SaveIncome(event=None):
     v_amount2.set('')
     E21.focus()
     update_table2()
+    update_graph()
+    total_text()
+    current_total = total_income()
+    progress['value'] = current_total
+    text = '{}/{}'.format(current_total,v_total.get())
+    v_result.set(text)
 
 
 B2 = ttk.Button(FT2,text='บันทึก',command=SaveIncome)
@@ -374,6 +414,14 @@ def delete_data2(event):
     if check:
         delete_income(ID)
         update_table2()
+        update_graph()
+        total_text()
+        current_total = total_income()
+        progress['value'] = current_total
+        current_total = total_income()
+        progress['value'] = current_total
+        text = '{}/{}'.format(current_total,v_total.get())
+        v_result.set(text)
 
 def update_data2(event):
     select = table2.selection()
@@ -407,6 +455,11 @@ def update_data2(event):
         update_income(ID,'title',v_income2.get())
         update_income(ID,'price',float(v_amount2E.get()))
         update_table2()
+        current_total = total_income()
+        progress['value'] = current_total
+        text = '{}/{}'.format(current_total,v_total.get())
+        v_result.set(text)
+        total_text()
         GUI2.destroy() #ปิดหน้าต่าง GUI2 ทิ้ง อยากใช้ค่อยเปิดใหม่
 
     B1 = ttk.Button(GUI2,text='บันทึก',command=UpdateData)
@@ -418,8 +471,98 @@ table2.bind('<Double-1>',update_data2)
 table2.bind('<Delete>',delete_data2) # don't forget 'event' in function
 
 
+### PROGRESS BAR
+
+goal_total = 200000
+current_total = total_income()
+
+v_result = StringVar()
+v_result.set('{}/{}'.format(current_total,goal_total))
+
+result = ttk.Label(T2,textvariable=v_result,font=(None,40))
+result.place(x=1200,y=150)
+
+
+progress = ttk.Progressbar(T2,orient="horizontal",length=450, mode="determinate")
+progress.place(x=1200,y=100)
+progress['maximum'] = goal_total
+progress['value'] = current_total
+
+FT2 = Frame(T2)
+FT2.place(x=1200,y=300)
+
+L = ttk.Label(FT2,text='เป้าหมาย income')
+L.grid(row=0,column=0,padx=10)
+
+v_total = IntVar()
+v_total.set(goal_total)
+
+E1 = ttk.Entry(FT2,textvariable=v_total,font=(None,20),width=10)
+E1.grid(row=0,column=1,padx=10)
+
+
+def settotal():
+    global current_total
+    current_total = total_income()
+    progress['value'] = current_total
+
+    global progress_value
+    progress_value = 0
+    
+    progress['maximum'] = v_total.get()
+    
+    text = '{}/{}'.format(current_total,v_total.get())
+    v_result.set(text)
+
+B1 = ttk.Button(FT2,text='Save / Reset',command=settotal)
+B1.grid(row=0,column=2,padx=10)
+
+
 #######################TAB 3#######################
 
+CV = Canvas(T3,width=800,height=600)
+CV.place(x=200,y=50)
 
+def Barchart(height=600,data=[400,200,300],color=['red','green','blue'],gwidth=200):
+    diff = 5
+    maxdata = max(data)
+
+    for i,(d,c) in enumerate(zip(data,color)):
+        v = (d/maxdata) * 100 * (height/100)
+        y = (height - v) + diff
+        g1 = CV.create_rectangle( (gwidth * i) + 50,y,(gwidth * (i+1)), height ,fill=c)
+
+
+def update_graph():
+    CV.delete(ALL)
+    data_income = total_income()
+    data_expense = total_expense()
+    remaining = data_income - data_expense
+    Barchart(data=[data_income,data_expense,remaining],color=['green','red','orange'])
+
+update_graph()
+
+def total_text():
+    data_income = total_income()
+    data_expense = total_expense()
+    remaining = data_income - data_expense
+    gt1.set('Income\n({})'.format(data_income))
+    gt2.set('Expense\n({})'.format(data_expense))
+    gt3.set('Remaining\n({})'.format(remaining))
+    #return (data_income,data_expense,remaining)
+
+gt1 = StringVar()
+gt2 = StringVar()
+gt3 = StringVar()
+
+GT1 = Label(T3,textvariable=gt1,font=(None,15))
+GT2 = Label(T3,textvariable=gt2,font=(None,15))
+GT3 = Label(T3,textvariable=gt3,font=(None,15))
+GT1.place(x=250,y=670)
+GT2.place(x=450,y=670)
+GT3.place(x=650,y=670)
+total_text()
+# GUI.bind('<F12>', lambda x=None: CV.delete(ALL))
+# GUI.bind('<F11>',lambda x=None: Barchart(data=[50,100,190],color=['green','red','orange']))
 
 GUI.mainloop()
